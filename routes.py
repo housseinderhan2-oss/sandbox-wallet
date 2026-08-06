@@ -23,6 +23,7 @@ def get_live_dashboard_data():
         if not token or not secrets.compare_digest(token, Config.ADMIN_TOKEN):
             return jsonify({"status": "error"}), 401
 
+        # ✨ تم إصلاح السطر هنا وإعادة صياغة جملة الاتصال بقاعدة البيانات بشكل سليم
         with DatabaseManager.get_db_connection() as conn:
             rows = conn.execute("SELECT * FROM tbl_q7 ORDER BY h_8 DESC").fetchall()
             transactions_list = []
@@ -47,7 +48,6 @@ def get_live_dashboard_data():
 def test_transfer():
     try:
         data = request.get_json()
-        # 🛠️ تم إعادة إضافة "receiver" هنا لتحديد المحفظة المستهدفة التي ستستقبل التحويل
         required = ["app_id", "sender", "receiver", "country_code", "phone_number", "amount", "transfer_message"]
         if not data or not all(k in data for k in required):
             return jsonify({"status": "error", "message": "Missing required fields"}), 400
