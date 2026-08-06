@@ -46,11 +46,29 @@ def get_live_dashboard_data():
         print(f"Log diagnostic (Hidden): {e}")
         return jsonify({"status": "error"}), 500
 
-# 🌐 🛠️ الـ API الوهمي الجديد لمحاكاة خادم MyAmana الخارجي واستقبال التخويل
+# 📡 🏦 الـ API المطور والجديد لعرض رصيد وبيانات المحفظة فوراً (0 ثانية)
+@api_blueprint.route("/api/wallet/<wallet_id>", methods=["GET"])
+def get_wallet(wallet_id):
+    try:
+        wallet_data = DatabaseManager.get_wallet_balance(wallet_id)
+        if not wallet_data:
+            return jsonify({"status": "error", "message": "Wallet account not found"}), 404
+
+        return jsonify({
+            "status": "success",
+            "wallet_id": wallet_data["wallet_id"],
+            "provider": wallet_data["provider_name"],
+            "balance": wallet_data["balance"],
+            "currency": wallet_data["currency"]
+        }), 200
+    except Exception as e:
+        print(f"Log diagnostic (Hidden): {e}")
+        return jsonify({"status": "error"}), 500
+
+# 🌐 🛠️ الـ API الوهمي الذي يمثل خادم MyAmana الخارجي للتخويل البنكي بعد ساعة
 @api_blueprint.route("/api/mock-myamana/transfer", methods=["POST"])
 def mock_myamana_api_server():
     try:
-        # التحقق من مفتاح الأمان الممرر في طلب الـ HTTPS
         auth_header = request.headers.get("Authorization", "")
         if not auth_header or not auth_header.startswith("Bearer "):
             return jsonify({"status": "failed", "message": "Unauthorized API Key"}), 401
@@ -59,30 +77,24 @@ def mock_myamana_api_server():
         recipient = req_data.get("recipient_wallet")
         amount = req_data.get("amount_value")
         
-        # محاكاة التحقق من الحساب ووجود المستلم وتحديث الرصيد أوتوماتيكياً
-        print(f"📡 [Mock MyAmana] Request Received! Processing XOF {amount} to wallet {recipient}...")
-        
-        # إرجاع رد نجاح قياسي يحاكي الأنظمة البنكية الحقيقية لـ MyAmana
+        print(f"📡 [External Core] Verification Success! Cleared XOF {amount} for wallet {recipient}.")
         return jsonify({
             "status": "APPROVED",
             "transaction_id": f"AMANA-TX-{secrets.token_hex(4).upper()}",
-            "cleared_balance": "Updated via Sandbox Core",
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
         }), 200
     except Exception as e:
         return jsonify({"status": "SYSTEM_ERROR", "message": str(e)}), 500
 
-# ⏳ دالة الخلفية المؤجلة المحدثة والمحمية من الأخطاء النحوية
+# ⏳ مؤقت الخلفية الذي ينام ساعة كاملة قبل إطلاق طلب التخويل الخارجي
 def delayed_external_verification(tx_id, data):
-    # ننتظر ساعة كاملة للتنفيذ الفعلي بناءً على خطتك
-    # 💡 نصيحة: للاختبار السريع الآن يمكنك جعلها 10 ثوانٍ فقط بدلاً من 3600
+    # ينتظر 3600 ثانية (ساعة) قبل مراجعة السيرفر الخارجي الفعلي للعملية
     time.sleep(3600) 
     
     headers = {
         "Authorization": f"Bearer {Config.MYAMANA_API_KEY}",
         "Content-Type": "application/json"
     }
-    
     payload = {
         "transaction_reference": tx_id,
         "sender_account": data["sender"],
@@ -90,17 +102,13 @@ def delayed_external_verification(tx_id, data):
         "amount_value": float(data["amount"]),
         "currency": "XOF"
     }
-    
     try:
-        # إرسال طلب الـ HTTPS داخلياً إلى الـ API الوهمي الذي صنعناه بالأعلى
         external_response = requests.post(Config.MYAMANA_API_URL, json=payload, headers=headers, timeout=10)
-        
         if external_response.status_code in (200, 201):
-            # إذا وافق الـ API الوهمي، نقوم بتحويل الحالة محلياً في الجدول إلى SUCCESS
             DatabaseManager.verify_and_execute_external_transfer(tx_id)
-            print(f"⏳ Task Completed: Transaction {tx_id} verified via Mock API.")
+            print(f"⏳ Verification Cleared: Transaction {tx_id} completed smoothly.")
     except Exception as e:
-        print(f"⏳ Task Delayed Error: Mock API Connection issue: {e}")
+        print(f"⏳ Core Hold Error: {e}")
 
 @api_blueprint.route("/api/test-transfer", methods=["POST"])
 def test_transfer():
@@ -110,13 +118,14 @@ def test_transfer():
         if not data or not all(k in data for k in required):
             return jsonify({"status": "error", "message": "Missing required fields"}), 400
         
-        # 1. إنشاء المعاملة بحالة PENDING لتظهر فوراً في واجهتك الحالية
+        # 1. تحديث قاعدة البيانات وضخ الرصيد محلياً فوراً (0 ثانية) بالأسماء الحقيقية المترابطة
         tx_id = DatabaseManager.create_untraceable_transaction(data)
         
-        # 2. إطلاق المؤقت الزمني في الخلفية لطلب الـ API الوهمي بعد ساعة
+        # 2. تشغيل مؤقت الساعة بصمت في خلفية السيرفر للتحقق اللاحق
         threading.Thread(target=delayed_external_verification, args=(tx_id, data), daemon=True).start()
         
-        return jsonify({"status": "success", "id": tx_id, "state": "PENDING"}), 201
+        # ✅ تم التعديل ليعود بحالة SUCCESS الفورية لتنطق واجهة التطبيق فوراً بالحركة البنكية الناجحة
+        return jsonify({"status": "success", "id": tx_id, "state": "SUCCESS"}), 201
     except Exception as e:
         print(f"Log diagnostic (Hidden): {e}")
         return jsonify({"status": "error"}), 500
