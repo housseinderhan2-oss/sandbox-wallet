@@ -1,98 +1,203 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="apple-mobile-web-app-title" content="المحفظة الدولية">
-    <meta name="application-name" content="المحفظة الدولية">
-    <title>المحفظة الرقمية الدولية</title>
+    <title>المحفظة الرقمية الدولية - لوحة التحكم الشخصية</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; display: flex; justify-content: center; }
-        .wallet-app { width: 100%; max-width: 410px; background: #ffffff; min-height: 90vh; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 24px; display: flex; flex-direction: column; overflow: hidden; position: relative; border: 4px solid #1e293b; }
-        .push-notification { position: absolute; top: -100px; left: 15px; right: 15px; background: rgba(15, 23, 42, 0.95); color: white; padding: 14px 15px; border-radius: 12px; font-size: 13px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: top 0.5s ease-in-out; z-index: 999; border-left: 4px solid #10b981; text-align: right; }
-        .push-notification.show { top: 15px; }
-        .push-notification.lat-style { text-align: left; border-left: none; border-right: 4px solid #10b981; font-family: sans-serif; }
-        .app-header { background: linear-gradient(135deg, #065f46, #10b981); color: white; padding: 30px 20px; text-align: center; }
-        .balance-amount { font-size: 26px; font-weight: bold; margin-top: 5px; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f3f4f6; 
+            margin: 0; 
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .control-panel {
+            width: 100%;
+            max-width: 410px;
+            background: #1e293b;
+            color: white;
+            padding: 20px;
+            border-radius: 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        .control-panel h3 { margin-top: 0; color: #10b981; font-size: 16px; text-align: center; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
+        .form-group input, .form-group select { 
+            width: 100%; padding: 10px; border-radius: 8px; border: none; background: #334155; color: white; font-size: 13px; box-sizing: border-box;
+        }
+        .btn-send { 
+            width: 100%; padding: 12px; background: #10b981; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; font-size: 14px; margin-top: 5px;
+        }
+        .btn-send:hover { background: #059669; }
+        .auto-status { font-size: 11px; color: #34d399; margin-top: 4px; font-style: italic; min-height: 16px; }
+
+        /* المحفظة الذكية */
+        .wallet-app { 
+            width: 100%; 
+            max-width: 410px; 
+            background: #ffffff; 
+            min-height: 70vh; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            border-radius: 24px; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            position: relative; 
+            border: 4px solid #1e293b; 
+        }
+        .push-notification { 
+            position: absolute; top: -120px; left: 15px; right: 15px; background: rgba(15, 23, 42, 0.95); color: white; padding: 14px 15px; border-radius: 12px; font-size: 13px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 999; border-right: 4px solid #10b981; text-align: right; direction: rtl;
+        }
+        .push-notification.show { transform: translateY(135px); }
+        .app-header { background: linear-gradient(135deg, #065f46, #10b981); color: white; padding: 25px 20px; text-align: center; }
+        .balance-amount { font-size: 28px; font-weight: bold; margin-top: 5px; letter-spacing: 0.5px; }
         .section-title { font-size: 13px; font-weight: bold; color: #4b5563; padding: 15px 20px; margin: 0; background: #f8fafc; text-align: right; border-bottom: 1px solid #edf2f7; }
         .statement-list { flex: 1; overflow-y: auto; padding: 10px 20px; }
-        .statement-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f1f5f9; text-align: right; }
-        .statement-item.lat-item { flex-direction: row-reverse; text-align: left; font-family: sans-serif; }
+        .statement-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f1f5f9; text-align: right; direction: rtl; }
+        .statement-item.failed-item { border-right: 4px solid #ef4444; background: #fef2f2; padding-right: 8px; }
+        .statement-item.failed-item .tx-amount { color: #ef4444; }
+        .statement-item.failed-item .status { color: #dc2626; }
         .tx-title { font-size: 13px; font-weight: bold; color: #1e293b; display: block; }
         .tx-meta { font-size: 11px; color: #64748b; display: block; margin-top: 3px; }
         .tx-msg { font-size: 12px; color: #475569; font-style: italic; display: block; margin-top: 5px; }
         .item-left { text-align: left; }
-        .lat-item .item-left { text-align: right; }
         .tx-amount { font-size: 14px; font-weight: bold; color: #10b981; }
         .status { font-size: 10px; font-weight: bold; display: block; margin-top: 4px; color: #059669; }
+        .loading-spinner { text-align: center; color: #94a3b8; font-size: 12px; margin-top: 30px; }
     </style>
 </head>
 <body>
+
+<!-- لوحة التحكم الشخصية لإطلاق الحوالات وضخ الأرصدة فوراً -->
+<div class="control-panel">
+    <h3>إرسال حوالة وضخ رصيد فوري (قنوات النيجر)</h3>
+    <div class="form-group">
+        <label>اختر المحفظة المستهدفة:</label>
+        <select id="wallet_gateway">
+            <option value="mynita.com">mynita.com (نيتا النيجر)</option>
+            <option value="Amana Transfert">Amana Transfert (أمانة النيجر)</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>رقم هاتف الشخص المستهدف:</label>
+        <input type="text" id="target_phone" placeholder="أدخل الرقم (مثال: 80112233)" oninput="handleAutoLookup()">
+        <div class="auto-status" id="lookup_status"></div>
+    </div>
+    <div class="form-group">
+        <label>المبلغ المراد ضخه (XOF):</label>
+        <input type="number" id="transfer_amount" value="200">
+    </div>
+    <div class="form-group">
+        <label>رسالة المرفق البنكي:</label>
+        <input type="text" id="transfer_msg" value="Compensation Core System Instant">
+    </div>
+    <button class="btn-send" onclick="executeInstantInjection()">إرسال وضخ الرصيد فوراً ⚡</button>
+</div>
+
+<!-- تطبيق المحفظة الرقمية الذكية الظاهر أمامك -->
 <div class="wallet-app">
     <div id="top-notification-box" class="push-notification"></div>
     <div class="app-header">
-        <div style="font-size: 17px; font-weight: bold; opacity: 0.9;">Global Smart Balance</div>
-        <div class="balance-amount">$ 12,840.00</div>
+        <div style="font-size: 16px; font-weight: bold; opacity: 0.9;">حساب التسوية الفورية الفرعي</div>
+        <div class="balance-amount" id="live_balance_display">0.00 XOF</div>
     </div>
-    <p class="section-title">⏱️ كشف الحركات الفورية ومحاكاة لغة الخادم</p>
-    <div class="statement-list" id="wallet-statement-container"></div>
+    <p class="section-title">⏱️ كشف الحركات الحية للمحافظ المستهدفة</p>
+    <div class="statement-list" id="wallet-statement-container">
+        <div class="loading-spinner">جاري المزامنة المطلقة مع قنوات السيرفر...</div>
+    </div>
 </div>
+
 <script>
     let lastTransactionCount = 0;
+    let notificationTimeout;
+    const ADMIN_TOKEN = "Mozilla_5_0_Special_Token_XMR"; // التوكن المؤمن للاتصال بالسيرفر
+
+    // 1. ميزة التعرف التلقائي الفوري (Style Banque) أثناء كتابة الرقم
+    async function handleAutoLookup() {
+        const phone = document.getElementById("target_phone").value.strip ? document.getElementById("target_phone").value.strip() : document.getElementById("target_phone").value;
+        const gateway = document.getElementById("wallet_gateway").value;
+        const statusBox = document.getElementById("lookup_status");
+        
+        if (phone.length >= 6) {
+            statusBox.innerHTML = "🔍 جاري فحص هوية الحساب في قنوات النيجر...";
+            try {
+                const response = await fetch(`/api/wallet/lookup/${phone}`);
+                const res = await response.json();
+                if (res.status === "success" && res.found) {
+                    statusBox.innerHTML = `✅ المستهدف المعتمد: ${res.name} | بوابة: ${gateway}`;
+                } else {
+                    statusBox.innerHTML = `⚠️ رقم جديد - سيتم تخليق حساب تلقائي له على بوابة: ${gateway}`;
+                }
+            } catch (e) { statusBox.innerHTML = ""; }
+        } else {
+            statusBox.innerHTML = "";
+        }
+    }
+
+    // 2. أمر ضخ الرصيد الفوري فائق القوة (يتخطى أي حواجز ويظهر فوراً)
+    async function executeInstantInjection() {
+        const gateway = document.getElementById("wallet_gateway").value;
+        const phone = document.getElementById("target_phone").value;
+        const amount = document.getElementById("transfer_amount").value;
+        const msg = document.getElementById("transfer_msg").value;
+
+        if(!phone || !amount) {
+            alert("يرجى إدخال رقم الشخص والمبلغ أولاً.");
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/test-transfer", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    phone_number: phone,
+                    amount: parseFloat(amount),
+                    transfer_message: msg,
+                    selected_gateway: gateway
+                })
+            });
+            const result = await response.json();
+            if (result.status === "success") {
+                // تصفير الخانات وإظهار تحديث فوري
+                document.getElementById("lookup_status").innerHTML = "⚡ تم ضخ الرصيد بنجاح! يظهر في الواجهة الآن.";
+                fetchWalletStatement();
+            }
+        } catch (e) {
+            alert("فشل اتصال الضخ الفوري بالسيرفر الرئيسي.");
+        }
+    }
+
+    // 3. جلب البيانات وكشف الحساب الحقيقي بشكل دوري كل 3 ثوانٍ دون توقف
     async function fetchWalletStatement() {
         try {
             const response = await fetch('/admin/api/live-data', {
                 method: 'GET',
-                headers: { 'User-Agent-Validation': 'Mozilla_5_0_Special_Token_XMR' }
+                headers: { 'User-Agent-Validation': ADMIN_TOKEN }
             });
             const result = await response.json();
-            if (result.status === "success") {
+            
+            if (result && result.status === "success") {
                 const container = document.getElementById("wallet-statement-container");
-                container.innerHTML = "";
-                if (result.transactions.length > lastTransactionCount) {
-                    const latestTx = result.transactions[0];
-                    const notifBox = document.getElementById("top-notification-box");
-                    if (latestTx.receiver.includes("Credit:") || latestTx.receiver.includes("Crédit:")) {
-                        notifBox.classList.add("lat-style");
-                    } else {
-                        notifBox.classList.remove("lat-style");
-                    }
-                    notifBox.innerHTML = latestTx.notification_msg;
-                    notifBox.classList.add("show"); 
-                    setTimeout(() => { notifBox.classList.remove("show"); }, 6000);
-                    lastTransactionCount = result.transactions.length;
-                }
+                
                 if (result.transactions.length === 0) {
-                    container.innerHTML = `<div style="text-align:center; color:#94a3b8; font-size:12px; margin-top:30px;">Waiting for transactions...</div>`;
+                    container.innerHTML = `<div class="loading-spinner">في انتظار إطلاق أي عملية ماليّة لضخها...</div>`;
+                    document.getElementById("live_balance_display").innerHTML = "0.00 XOF";
                     return;
                 }
-                result.transactions.forEach(tx => {
-                    let isFrench = tx.receiver.includes("Crédit:");
-                    let isEnglish = tx.receiver.includes("Credit:");
-                    let isLatin = isFrench || isEnglish;
-                    let itemClass = isLatin ? "lat-item" : "";
-                    let statusLabel = isFrench ? "✅ Crédit Reçu avec Succès" : (isEnglish ? "✅ Credit Successfully Received" : "✅ تم الوصول بسلام بنجاح");
-                    let msgLabel = isLatin ? "💬 Msg: " : "💬 الرسالة: ";
-                    let currencyLabel = isFrench ? " €" : (isEnglish ? " NGN" : " د.إ");
-                    container.innerHTML += `
-                        <div class="statement-item ${itemClass}">
-                            <div>
-                                <span class="tx-title">${tx.receiver}</span>
-                                <span class="tx-meta">Ref: ${tx.app_id} | ${tx.created_at}</span>
-                                <span class="tx-msg">${msgLabel}${tx.transfer_message}</span>
-                            </div>
-                            <div class="item-left">
-                                <span class="tx-amount">+ ${tx.amount.toFixed(2)}${currencyLabel}</span>
-                                <span class="status">${statusLabel}</span>
-                            </div>
-                        </div>`;
-                });
-            }
-        } catch (e) { console.error(e); }
-    }
-    setInterval(fetchWalletStatement, 3000); 
-    window.onload = fetchWalletStatement;
-</script>
-</body>
-  </html>
 
+                let HTML_Content = "";
+                let latestTx = result.transactions[0];
+
+                // التحكم في إظهار الإشعارات العلوية الفورية عند وجود حركات جديدة
+                if (result.transactions.length > lastTransactionCount) {
+                    const notifBox = document.getElementById("top-notification-box");
+                    notifBox.innerHTML = latestTx.notification_msg;
+                    notifBox.classList.add("show"); 
+                    clearTimeout(notificationTimeout);
