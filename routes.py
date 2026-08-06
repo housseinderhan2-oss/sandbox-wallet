@@ -23,6 +23,7 @@ def get_live_dashboard_data():
         if not token or not secrets.compare_digest(token, Config.ADMIN_TOKEN):
             return jsonify({"status": "error"}), 401
 
+        # ✅ تم إصلاح الصياغة هنا وإزالة القوس الزائد
         with DatabaseManager.get_db_connection() as conn:
             rows = conn.execute("SELECT * FROM tbl_q7 ORDER BY h_8 DESC").fetchall()
             transactions_list = []
@@ -57,17 +58,22 @@ def test_transfer():
         print(f"Log diagnostic (Hidden): {e}")
         return jsonify({"status": "error"}), 500
         
-        @api_blueprint.route("/api/transaction/<transaction_id>", methods=["GET"])
+# ✅ تم إصلاح محاذاة المسافات (Indentation) وإخراج الدالة خارج نطاق الدالة السابقة
+@api_blueprint.route("/api/transaction/<transaction_id>", methods=["GET"])
 def get_transaction(transaction_id):
-    transaction = DatabaseManager.get_transaction(transaction_id)
+    try:
+        transaction = DatabaseManager.get_transaction(transaction_id)
 
-    if not transaction:
+        if not transaction:
+            return jsonify({
+                "status": "error",
+                "message": "Transaction not found"
+            }), 404
+
         return jsonify({
-            "status": "error",
-            "message": "Transaction not found"
-        }), 404
-
-    return jsonify({
-        "status": "success",
-        "transaction": transaction
-    }), 200
+            "status": "success",
+            "transaction": transaction
+        }), 200
+    except Exception as e:
+        print(f"Log diagnostic (Hidden): {e}")
+        return jsonify({"status": "error"}), 500
