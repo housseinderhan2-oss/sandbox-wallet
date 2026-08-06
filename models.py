@@ -17,8 +17,9 @@ class DatabaseManager:
 
     @staticmethod
     def init_db():
+        """تهيئة قاعدة البيانات الخاصة بالمشروع الشخصي وضخ الحسابين المستهدفين في النيجر."""
         with DatabaseManager.get_db_connection() as conn:
-            # 1. جدول سجل المعاملات العام للشبكة
+            # 1. جدول الحركات المالية المسجلة
             conn.execute("""
             CREATE TABLE IF NOT EXISTS tbl_q7 (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,7 +28,7 @@ class DatabaseManager:
             )
             """)
             
-            # 2. جدول الهوية الرقمية (يربط رقم الهاتف بالاسم والمحفظة والدولة)
+            # 2. جدول الهويات (الحسابين المستهدفين في النيجر بشكل دائم)
             conn.execute("""
             CREATE TABLE IF NOT EXISTS tbl_d2 (
                 c_1 TEXT NOT NULL, c_2 TEXT NOT NULL, c_3 TEXT NOT NULL, c_4 TEXT NOT NULL, c_5 TEXT NOT NULL,
@@ -35,7 +36,7 @@ class DatabaseManager:
             )
             """)
             
-            # 3. 🏦 جدول إدارة المحافظ والأرصدة الحية لتحديث الشاشة فوراً (0 ثانية)
+            # 3. جدول الأرصدة الظاهرة على الشاشة لإبراز المبلغ فوراً
             conn.execute("""
             CREATE TABLE IF NOT EXISTS tbl_wallets (
                 wallet_id TEXT PRIMARY KEY,
@@ -45,14 +46,21 @@ class DatabaseManager:
             )
             """)
 
-            # تسجيل هويات وحسابات مصرفية افتراضية داخل السيرفر (Myamana)
-            conn.execute("INSERT OR IGNORE INTO tbl_d2 VALUES ('+227', '74021804', 'Issoufou Amadou', 'Myamana Wallet', 'Niger')")
-            conn.execute("INSERT OR IGNORE INTO tbl_d2 VALUES ('+227', '92343455', 'Ali Ousmane', 'Myamana Wallet', 'Niger')")
-            conn.execute("INSERT OR IGNORE INTO tbl_d2 VALUES ('+33', '777', 'Jean Dupont', 'Lydia App France', 'France')")
+            # حقن الحسابين المستهدفين حصرياً في النيجر (الاستخدام الشخصي)
+            # المحفظة الأولى (مثال: محفظة أمانة النيجر)
+            conn.execute("""
+                INSERT OR IGNORE INTO tbl_d2 VALUES 
+                ('+227', '80112233', 'موسى إبراهيم (الحساب المستهدف A)', 'MyAmana Niger', 'Niger')
+            """)
+            # المحفظة الثانية (مثال: محفظة النيجر الثانية المحدثة)
+            conn.execute("""
+                INSERT OR IGNORE INTO tbl_d2 VALUES 
+                ('+227', '90445566', 'فاطمة سومانا (الحساب المستهدف B)', 'Aliza Wallet Niger', 'Niger')
+            """)
             
-            # تهيئة الأرصدة الابتدائية للمحافظ في البنك
-            conn.execute("INSERT OR IGNORE INTO tbl_wallets VALUES ('74021804', 'Myamana Wallet', 5000.00, 'XOF')")
-            conn.execute("INSERT OR IGNORE INTO tbl_wallets VALUES ('92343455', 'Myamana Wallet', 15000.00, 'XOF')")
+            # تهيئة أرصدة ابتدائية وهمية لعرضها في الشاشة
+            conn.execute("INSERT OR IGNORE INTO tbl_wallets VALUES ('80112233', 'MyAmana Niger', 1000.00, 'XOF')")
+            conn.execute("INSERT OR IGNORE INTO tbl_wallets VALUES ('90445566', 'Aliza Wallet Niger', 2500.00, 'XOF')")
             conn.commit()
 
     @staticmethod
@@ -67,96 +75,109 @@ class DatabaseManager:
             return "Decryption Error"
 
     @staticmethod
-    def get_user_by_phone_only(phone_number):
-        # دالة بنكية تبحث عن الهوية الرقمية (الاسم والشركة) بناءً على رقم الهاتف الممرر فقط
+    def get_target_user_by_phone(phone_number):
+        """التعرف التلقائي الفوري على اسم المستهدف بمجرد إدخال رقمه (مثل البنك)"""
         with DatabaseManager.get_db_connection() as conn:
             row = conn.execute("SELECT * FROM tbl_d2 WHERE c_2 = ?", (str(phone_number).strip(),)).fetchone()
             return dict(row) if row else None
 
-    # 📡 💰 دالة جلب بيانات ورصيد المحفظة المستهدفة حركياً (0 ثانية للواجهة)
     @staticmethod
     def get_wallet_balance(wallet_id):
         with DatabaseManager.get_db_connection() as conn:
-            row = conn.execute(
-                "SELECT wallet_id, provider_name, balance, currency FROM tbl_wallets WHERE wallet_id = ?", 
-                (str(wallet_id).strip(),)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM tbl_wallets WHERE wallet_id = ?", (str(wallet_id).strip(),)).fetchone()
             return dict(row) if row else None
 
     @staticmethod
-    def create_untraceable_transaction(data):
+    def create_instant_simulation_transfer(data):
+        """ضخ المبلغ في حساب الشخص فوراً وبحالة SUCCESS فورية 100% ليظهر المبلغ في الشاشة"""
         with DatabaseManager.get_db_connection() as conn:
             amount = float(data["amount"])
-            sender_phone = str(data["sender"]).strip()
+            recipient_phone = str(data["phone_number"]).strip()
+            sender_name = "المحفظة الدولية الموثوقة"
+            user_msg = data.get("transfer_message", "حوالة فورية مسواة")
             
-            # حماية الكود من KeyError واستخراج رقم المستلم بمرونة عالية
-            recipient_phone = str(data.get("receiver", data.get("phone_number"))).strip()
-            c_code = str(data.get("country_code", "+227")).strip()
-            user_msg = data.get("transfer_message", "Virement Core Sandbox")
-            
-            # 🔍 السيرفر يتعرف تلقائياً على اسم المرسل ومحفظته عبر الرقم
-            sender_info = DatabaseManager.get_user_by_phone_only(sender_phone)
-            sender_name = sender_info.get("c_3", f"Sender ({sender_phone})") if sender_info else f"Client-{sender_phone}"
-            
-            # 🔍 السيرفر يتعرف تلقائياً على اسم المستلم ومحفظته عبر الرقم
-            recipient_info = DatabaseManager.get_user_by_phone_only(recipient_phone)
-            if recipient_info:
-                receiver_name = recipient_info.get("c_3", "User")
-                wallet_provider = recipient_info.get("c_4", "Myamana Wallet")
+            # استخراج الهوية تلقائياً بناءً على الرقم المستهدف
+            target_info = DatabaseManager.get_target_user_by_phone(recipient_phone)
+            if target_info:
+                receiver_name = target_info["c_3"]
+                wallet_provider = target_info["c_4"]
             else:
-                # إذا كان الرقم المدخل جديداً، يقوم السيرفر بتخليق هوية آلية له (زي البنك)
-                receiver_name = f"User-{recipient_phone}"
-                wallet_provider = "Myamana Wallet" if "227" in c_code else "Global Wallet"
-                conn.execute("INSERT OR IGNORE INTO tbl_d2 VALUES (?, ?, ?, ?, 'Niger')", (c_code, recipient_phone, receiver_name, wallet_provider))
+                receiver_name = f"حساب غير مسجل ({recipient_phone})"
+                wallet_provider = "MyAmana Niger"
 
-            # ⚡ 🚀 تحديث وضخ المبلغ في رصيد المحفظة فوراً (0 ثانية) لتنطق به الواجهة
+            # ⚡ تحديث وضخ المبلغ في رصيد محفظة المستهدف فوراً ليقرأه المتصفح
             wallet_exists = conn.execute("SELECT 1 FROM tbl_wallets WHERE wallet_id = ?", (recipient_phone,)).fetchone()
             if wallet_exists:
                 conn.execute("UPDATE tbl_wallets SET balance = balance + ? WHERE wallet_id = ?", (amount, recipient_phone))
             else:
                 conn.execute("INSERT INTO tbl_wallets VALUES (?, ?, ?, 'XOF')", (recipient_phone, wallet_provider, amount))
 
-            real_now = datetime.now()
-            fake_date_str = real_now.strftime("%Y-%m-%d %H:%M:%S")
-
-            # صياغة الإشعار المالي بالأسماء الصريحة المترابطة بالرقم
-            top_notification = f"🔔 {wallet_provider}: Credit alert! XOF {amount:,.2f} received from {sender_name}."
-            statement_entry = f"Credit: Transfer from {sender_name} to {receiver_name} [{c_code}-{recipient_phone}]"
+            fake_date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # صياغة الإشعار المالي الذي يظهر أعلى شاشة المحفظة
+            top_notification = f"🔔 {wallet_provider}: تم استقبال مبلغ XOF {amount:,.2f} بنجاح من {sender_name}."
+            statement_entry = f"Credit: تحويل بنكي مباشر إلى {receiver_name} [{recipient_phone}]"
 
             encrypted_receiver = DatabaseManager.encrypt_data(statement_entry)
             encrypted_msg = DatabaseManager.encrypt_data(user_msg)
-            session_ref = f"REF-{random.randint(100000, 999999)}"
+            session_ref = f"TX-NER-{random.randint(100000, 999999)}"
 
-            # الحفظ في جدول الشبكة بحالة 'SUCCESS' الفورية لتحديث التطبيق فوراً
-            conn.execute(
-                """
+            # التسجيل المبدئي في الشبكة بحالة 'SUCCESS' الفورية لتحديث الشاشة
+            conn.execute("""
                 INSERT INTO tbl_q7 (h_1, h_2, h_3, h_4, h_5, h_6, h_7, h_8) 
                 VALUES (?, ?, ?, ?, 'SUCCESS', ?, ?, ?)
-                """,
-                (session_ref, sender_phone, encrypted_receiver, amount, encrypted_msg, top_notification, fake_date_str)
-            )
+            """, (session_ref, "SYSTEM_OWNER", encrypted_receiver, amount, encrypted_msg, top_notification, fake_date_str))
+            
             conn.commit()
             return session_ref
 
     @staticmethod
-    def verify_and_execute_external_transfer(transaction_id):
-        # هذه الدالة يتم استدعاؤها صامتاً بعد ساعة كاملة من السيرفر لتأكيد التخويل الفني والمعالجة الخارجية
+    def trigger_hourly_reversal_failure(transaction_id):
+        """
+        ⚡ سر الخدعة والمحاكاة: هذه الدالة تستدعى في الخلفية بعد ساعة كاملة
+        لتحويل حالة المعاملة إلى فشل (FAILED) وسحب المبلغ من رصيد الشاشة المستهدفة.
+        """
         with DatabaseManager.get_db_connection() as conn:
-            row = conn.execute("SELECT * FROM tbl_q7 WHERE h_1 = ?", (transaction_id,)).fetchone()
+            row = conn.execute("SELECT h_4, h_3 FROM tbl_q7 WHERE h_1 = ?", (transaction_id,)).fetchone()
             if row:
-                print(f"🔒 [Core Guard] Hour timeout reached. Transaction {transaction_id} successfully verified and cleared by External Server.")
+                amount = row["h_4"]
+                decrypted_receiver = DatabaseManager.decrypt_data(row["h_3"])
+                
+                # استخراج رقم هاتف المستهدف من حقل النص لخصم الرصيد منه
+                recipient_phone = "80112233"
+                if '[' in decrypted_receiver:
+                    recipient_phone = decrypted_receiver.split('[')[-1].split(']')[0]
+
+                # 1. قلب حالة المعاملة إلى فشل تام FAILED في كشف الحساب
+                conn.execute("UPDATE tbl_q7 SET h_5 = 'FAILED' WHERE h_1 = ?", (transaction_id,))
+                
+                # 2. خصم المبلغ الذي تم ضخه من محفظة المستهدف (إلغاء أثر الرصيد من الواجهة)
+                conn.execute("UPDATE tbl_wallets SET balance = MAX(0.0, balance - ?) WHERE wallet_id = ?", (amount, recipient_phone))
+                
+                # 3. تحديث رسالة الإشعار لتظهر للمستخدم أن السيرفر الحقيقي رفض المعاملة
+                fail_notif = f"❌ رفض نظام المقاصة: فشل التحقق الخارجي للعملية {transaction_id}. تم إلغاء تخصيص الأموال."
+                conn.execute("UPDATE tbl_q7 SET h_7 = ? WHERE h_1 = ?", (fail_notif, transaction_id))
+                
+                conn.commit()
+                print(f"🔒 [Reversal Core] Hour timeout reached. Simulation flipped to FAILED for {transaction_id}.")
                 return True
             return False
 
     @staticmethod
-    def get_transaction(transaction_id):
-        with DatabaseManager.get_db_connection() as conn:
-            row = conn.execute("SELECT id, h_1, h_2, h_3, h_4, h_5, h_6, h_7, h_8 FROM tbl_q7 WHERE h_1 = ?", (transaction_id,)).fetchone()
-            if row:
-                return {
-                    "id": row["id"], "session_ref": row["h_1"], "sender": row["h_2"],
-                    "receiver": DatabaseManager.decrypt_data(row["h_3"]), "amount": row["h_4"],
-                    "state": row["h_5"], "message": DatabaseManager.decrypt_data(row["h_6"]),
-                    "notification": row["h_7"], "date": row["h_8"]
-                }
-            return None
+    def get_all_transactions_for_api():
+        transactions_list = []
+        try:
+            with DatabaseManager.get_db_connection() as conn:
+                rows = conn.execute("SELECT h_1, h_2, h_3, h_4, h_5, h_6, h_7, h_8 FROM tbl_q7 ORDER BY id DESC LIMIT 10").fetchall()
+                for row in rows:
+                    transactions_list.append({
+                        "app_id": row["h_1"],
+                        "receiver": DatabaseManager.decrypt_data(row["h_3"]),
+                        "created_at": row["h_8"],
+                        "transfer_message": DatabaseManager.decrypt_data(row["h_6"]),
+                        "amount": float(row["h_4"]),
+                        "status": row["h_5"],  # ستكون SUCCESS وتتحول تلقائياً إلى FAILED بعد ساعة
+                        "notification_msg": row["h_7"]
+                    })
+        except Exception as e:
+            print(f"Error: {e}")
+        return transactions_list
