@@ -56,3 +56,18 @@ def test_transfer():
     except Exception as e:
         print(f"Log diagnostic (Hidden): {e}")
         return jsonify({"status": "error"}), 500
+        
+        @api_blueprint.route("/api/transaction/<transaction_id>", methods=["GET"])
+def get_transaction(transaction_id):
+    transaction = DatabaseManager.get_transaction(transaction_id)
+
+    if not transaction:
+        return jsonify({
+            "status": "error",
+            "message": "Transaction not found"
+        }), 404
+
+    return jsonify({
+        "status": "success",
+        "transaction": transaction
+    }), 200
