@@ -1,124 +1,187 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة محاكاة المقاصة الفورية وحقن البيانات الحية</title>
+    <title>Amana Transfert - Core Simulation</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #0f172a; color: #e2e8f0; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .panel { width: 100%; max-width: 600px; background: #1e293b; padding: 20px; border-radius: 16px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
-        h2, h3 { margin-top: 0; color: #38bdf8; text-align: center; }
-        .form-group { margin-bottom: 12px; }
-        label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 4px; }
-        input, select { width: 100%; padding: 10px; border-radius: 8px; border: none; background: #334155; color: white; box-sizing: border-box; }
-        .btn { width: 100%; padding: 12px; background: #10b981; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; font-size: 14px; margin-top: 10px; }
-        .btn:hover { background: #059669; }
-        .auto-box { font-size: 11px; color: #34d399; margin-top: 4px; min-height: 16px; }
+        body { 
+            font-family: sans-serif; background-color: #0f172a; margin: 0; padding: 10px;
+            display: flex; flex-direction: column; align-items: center; color: #e2e8f0;
+        }
+        /* لوحة التحكم المخفية/العلوية للضخ */
+        .injector-panel {
+            width: 100%; max-width: 390px; background: #1e293b; padding: 15px;
+            border-radius: 16px; margin-bottom: 15px; box-sizing: border-box; border: 1px dashed #38bdf8;
+        }
+        .injector-panel h3 { margin: 0 0 10px 0; color: #38bdf8; font-size: 14px; text-align: center; }
+        .form-group { margin-bottom: 8px; text-align: right; }
+        .form-group label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 3px; }
+        .form-group input, .form-group select { 
+            width: 100%; padding: 8px; border-radius: 6px; border: none; background: #334155; color: white; font-size: 12px; box-sizing: border-box;
+        }
+        .btn-inject { 
+            width: 100%; padding: 10px; background: #10b981; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; font-size: 12px;
+        }
+        .auto-status { font-size: 11px; color: #34d399; text-align: right; margin-top: 3px; min-height: 15px; }
+
+        /* المحفظة المحاكية المطبقة للأصل المتواجد في الصورة */
+        .amana-app {
+            width: 100%; max-width: 390px; background: #ffffff; min-height: 80vh;
+            border-radius: 24px; overflow: hidden; position: relative; color: #334155;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 4px solid #1e293b;
+        }
+        .amana-header {
+            background: linear-gradient(to bottom, #ff9800, #f57c00); color: white; padding: 20px 15px; position: relative;
+        }
+        .top-meta { display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; margin-bottom: 15px; }
+        .user-card { background: rgba(255, 255, 255, 0.95); border-radius: 16px; padding: 15px; margin-top: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .user-name { font-size: 18px; font-weight: bold; color: #e65100; margin: 0; text-transform: lowercase; }
+        .user-phone { font-size: 13px; color: #666; margin: 3px 0 10px 0; }
+        .balance-box { display: flex; align-items: center; gap: 8px; color: #e65100; font-weight: bold; font-size: 18px; border-top: 1px solid #eee; padding-top: 10px; }
         
-        /* كشف الحساب الموسع */
-        .tx-card { background: #1e293b; border: 2px solid #334155; border-radius: 12px; padding: 15px; margin-bottom: 15px; width: 100%; max-width: 600px; box-sizing: border-box; }
-        .tx-card.SUCCESS { border-color: #10b981; }
-        .tx-card.FAILED { border-color: #ef4444; background: #1a1018; }
-        .grid-blocks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px; margin-top: 10px; border-top: 1px solid #334155; padding-top: 10px; }
-        .block-title { font-weight: bold; color: #38bdf8; margin-bottom: 3px; }
-        .status-badge { float: left; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }
-        .SUCCESS .status-badge { background: #065f46; color: #34d399; }
-        .FAILED .status-badge { background: #991b1b; color: #fca5a5; }
-        .log-text { font-family: monospace; color: #cbd5e1; background: #0f172a; padding: 5px; border-radius: 4px; word-break: break-all; }
+        /* الأزرار والشبكة البنكية الداخلية كما في الصورة */
+        .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 15px; }
+        .menu-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px 10px; text-align: center; font-size: 11px; font-weight: bold; color: #475569; }
+        .menu-item-icon { font-size: 20px; margin-bottom: 5px; color: #ff9800; }
+        
+        .main-services { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 0 15px 15px 15px; }
+        .service-box { text-align: center; font-size: 10px; font-weight: bold; color: #64748b; }
+        .service-icon { background: #f1f5f9; width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 5px auto; font-size: 16px; color: #ff9800; border: 1px solid #e2e8f0; }
+
+        /* الإشعار البنكي المنبثق العلوي المطور */
+        .push-alert {
+            position: absolute; top: -100px; left: 12px; right: 12px; background: #1e293b; color: white; padding: 12px; border-radius: 10px; font-size: 12px; border-left: 4px solid #10b981; transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .push-alert.show { transform: translateY(115px); }
+        .push-alert.FAILED { border-left-color: #ef4444; }
     </style>
 </head>
 <body>
 
-<div class="panel">
-    <h2>ضخ الحوالات وتجاوز حماية التطبيقات (المحاكاة المطلقة)</h2>
+<!-- 🛠️ لوحة التحكم السرية لحقن المبالغ وتجاوز الشروط محلياً -->
+<div class="injector-panel">
+    <h3>لوحة التحكم وسيرفر التخطي الفوري (Core Mock)</h3>
     <div class="form-group">
-        <label>المحفظة المستهدفة المعتمدة:</label>
-        <select id="gateway">
-            <option value="mynita.com">mynita.com (نيتا النيجر)</option>
+        <label>بوابة التشغيل المستهدفة:</label>
+        <select id="selected_gateway">
             <option value="Amana Transfert">Amana Transfert (أمانة النيجر)</option>
+            <option value="mynita.com">mynita.com (نيتا النيجر)</option>
         </select>
     </div>
     <div class="form-group">
-        <label>رقم هاتف الشخص المستهدف:</label>
-        <input type="text" id="phone" placeholder="أدخل 80112233 أو 90445566" oninput="checkUser()">
-        <div class="auto-box" id="lookup"></div>
+        <label>رقم هاتف المستهدف (المستلم):</label>
+        <input type="text" id="phone_input" placeholder="اكتب 74021804 المطابق للصورة" oninput="triggerLookup()">
+        <div class="auto-status" id="lookup_box"></div>
     </div>
     <div class="form-group">
-        <label>المبلغ (XOF):</label>
-        <input type="number" id="amount" value="250">
+        <label>المبلغ المراد ضخه فوراً (XOF):</label>
+        <input type="number" id="amount_input" value="25000">
     </div>
-    <button class="btn" onclick="sendInjection()">تخطي وفحص الأمان وحقن الحوالة فوراً ⚡</button>
+    <button class="btn-inject" onclick="startInstantCoreInjection()">تخطي الحماية وجعل الرصيد يظهر فوراً ⚡</button>
 </div>
 
-<h3>📋 سجل المراقبة وفحص حزم الأمان والعمليات (محدث حي)</h3>
-<div id="container" style="width: 100%; max-width: 600px;"></div>
+<!-- 📱 المحفظة الرقمية المحاكية بالكامل للتطبيق المتواجد بالصورة -->
+<div class="amana-app">
+    <div id="notification_node" class="push-alert"></div>
+    
+    <div class="amana-header">
+        <div class="top-meta">
+            <div>21:04</div>
+            <div>📶 🔋 73%</div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 20px; font-weight: bold;">Bonne soirée</div>
+            <div style="font-size: 18px;">🌐 🔔 ⏻</div>
+        </div>
+
+        <!-- كرت الحساب الشخصي (يتغير تلقائياً حسب الرقم المدخل) -->
+        <div class="user-card">
+            <p class="user-name" id="display_name">mama hamza</p>
+            <p class="user-phone">📞 <span id="display_phone">0022774021804</span></p>
+            <div class="balance-box">
+                <span>👁️</span>
+                <span id="app_balance_field">0 XOF</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- شبكة القوائم كما في التطبيق الأصلي -->
+    <div class="menu-grid">
+        <div class="menu-item"><div class="menu-item-icon">⇅</div>Mes transactions</div>
+        <div class="menu-item"><div class="menu-item-icon">📥</div>Mes recharges</div>
+    </div>
+
+    <!-- الخدمات الأساسية المضافة للتطابق البصري -->
+    <div class="main-services">
+        <div class="service-box"><div class="service-icon">🛩️</div>Transfert d'argent</div>
+        <div class="service-box"><div class="service-icon">🔄</div>Envoi à moi même</div>
+        <div class="service-box"><div class="service-icon">📱</div>Envoi compte à compte</div>
+    </div>
+    <div class="main-services">
+        <div class="service-box"><div class="service-icon">🧮</div>Calcul frais</div>
+        <div class="service-box"><div class="service-icon">💳</div>Paiement</div>
+        <div class="service-box"><div class="service-icon">📞</div>Achat crédit</div>
+    </div>
+</div>
 
 <script>
-    async function checkUser() {
-        const phone = document.getElementById("phone").value;
-        if(phone.length >= 6) {
+    // 1. فحص الهوية والتعرف الآلي أثناء الكتابة (Style Banque)
+    async function triggerLookup() {
+        const phone = document.getElementById("phone_input").value;
+        const lookupBox = document.getElementById("lookup_box");
+        
+        if (phone.length >= 6) {
+            lookupBox.innerHTML = "🔍 جاري فحص الحساب بقنوات النيجر...";
+            // نقوم بالبحث في قاعدة بيانات السيرفر
             const r = await fetch(`/api/wallet/lookup/${phone}`);
             const res = await r.json();
-            if(res.found) document.getElementById("lookup").innerHTML = `👤 تم كشف المستهدف تلقائياً: ${res.name} عبر قنوات ${res.provider}`;
-            else document.getElementById("lookup").innerHTML = `⚠️ مستهدف جديد غير مدرج - سيتم تخليق بياناته`;
+            if (res.found) {
+                lookupBox.innerHTML = `✅ مستهدف معتمد: ${res.name}`;
+                // تحديث الواجهة فوراً لتطابق الاسم بنكياً
+                document.getElementById("display_name").innerHTML = res.name.toLowerCase();
+                document.getElementById("display_phone").innerHTML = "00227" + phone;
+            }
         }
     }
 
-    async function sendInjection() {
-        const phone = document.getElementById("phone").value;
-        const amount = document.getElementById("amount").value;
-        const gateway = document.getElementById("gateway").value;
-        if(!phone || !amount) return alert("املاً البيانات");
+    // 2. أمر ضخ الرصيد الفوري فائق القوة (تجاوز القيود وعرض المبلغ رغماً عن أي حماية)
+    async function startInstantCoreInjection() {
+        const phone = document.getElementById("phone_input").value;
+        const amount = document.getElementById("amount_input").value;
+        const gateway = document.getElementById("selected_gateway").value;
 
-        await fetch("/api/test-transfer", {
+        if (!phone || !amount) return alert("الرجاء إدخال رقم الهاتف والمبلغ");
+
+        // إرسال طلب التخطي وضخ البيانات الأربعة للسيرفر لحفظ الـ Logs والأمان
+        const r = await fetch("/api/test-transfer", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ phone_number: phone, amount: parseFloat(amount), selected_gateway: gateway })
         });
-        document.getElementById("phone").value = "";
-        getData();
+        const res = await r.json();
+
+        if (res.state === "SUCCESS") {
+            // ⚡ فرض ظهور الرصيد فوراً على واجهة التطبيق المحاكي لتتخطى القيود الخارجة
+            document.getElementById("app_balance_field").innerHTML = `${parseFloat(amount).toLocaleString()} XOF`;
+            
+            // إظهار إشعار الإيداع الأخضر العلوي
+            const notif = document.getElementById("notification_node");
+            notif.className = "push-alert show";
+            notif.innerHTML = `<strong>MyAmana Alert:</strong> Dépôt de ${parseFloat(amount).toLocaleString()} XOF effectué avec succès.`;
+            
+            // إخفاء الإشعار بعد 6 ثوانٍ
+            setTimeout(() => { notif.classList.remove("show"); }, 6000);
+        }
     }
 
-    async function getData() {
+    // 3. المزامنة المستمرة مع السيرفر لالتقاط وضع الفشل (FAILED) بعد ساعة تلقائياً
+    async function syncAppDatabase() {
         const r = await fetch("/admin/api/live-data");
         const res = await r.json();
-        const container = document.getElementById("container");
-        container.innerHTML = "";
-        
-        res.transactions.forEach(t => {
-            container.innerHTML += `
-                <div class="tx-card ${t.transaction.status}">
-                    <span class="status-badge">${t.transaction.status}</span>
-                    <strong style="color: #10b981; font-size: 15px;">+ ${t.transaction.amount} XOF</strong>
-                    <div style="font-size: 11px; color: #94a3b8; margin-top: 3px;">رقم المعاملة: ${t.transaction.transaction_id} | وقت الضخ: ${t.transaction.timestamp}</div>
-                    
-                    <div class="grid-blocks">
-                        <div>
-                            <div class="block-title">👤 بيانات المرسل (صاحب السيرفر)</div>
-                            <div>الاسم: ${t.sender.name}</div>
-                            <div>الحساب: ${t.sender.account_id}</div>
-                            <div>المعرف: ${t.sender.user_id}</div>
-                        </div>
-                        <div>
-                            <div class="block-title">🎯 بيانات المستلم (المستهدف)</div>
-                            <div>الاسم: المستفيد في شبكة النيجر</div>
-                            <div>الحساب الرقمي: ${t.receiver.account_number}</div>
-                            <div>المحفظة: ${t.receiver.provider} | الدولة: ${t.receiver.country}</div>
-                        </div>
-                    </div>
-                    <div class="grid-blocks" style="grid-template-columns: 1fr;">
-                        <div>
-                            <div class="block-title">🔒 بيانات الأمان والتخطي وفحص الاحتيال (Fraud & Keys)</div>
-                            <div>API Key المحاكي: <span style="color: #fbbf24;">${t.security.api_key}</span></div>
-                            <div>فحص الاحتيال الفوري: <span style="color: #34d399;">${t.security.fraud_checks}</span></div>
-                            <div class="log-text">السجل التشخيصي للبوابة: ${t.security.logs}</div>
-                        </div>
-                    </div>
-                </div>`;
-        });
-    }
-
-    document.addEventListener("DOMContentLoaded", () => { getData(); setInterval(getData, 3000); });
-</script>
-</body>
-</html>
+        if (res.status === "success" && res.transactions.length > 0) {
+            const latest = res.transactions[0].transaction;
+            
+            // إذا مر الوقت وقام السيرفر بقلب المعاملة إلى فشل، يتم سحب الرصيد وتحديث الواجهة تلقائياً
+            if (latest.status === "FAILED") {
+                document.getElementById("app_balance_field").innerHTML = "0 XOF";
