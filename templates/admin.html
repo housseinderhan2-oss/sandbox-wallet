@@ -1,1 +1,98 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-title" content="المحفظة الدولية">
+    <meta name="application-name" content="المحفظة الدولية">
+    <title>المحفظة الرقمية الدولية</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .wallet-app { width: 100%; max-width: 410px; background: #ffffff; min-height: 90vh; box-shadow: 0 4px 20px rgba(0,0,0,0.1); border-radius: 24px; display: flex; flex-direction: column; overflow: hidden; position: relative; border: 4px solid #1e293b; }
+        .push-notification { position: absolute; top: -100px; left: 15px; right: 15px; background: rgba(15, 23, 42, 0.95); color: white; padding: 14px 15px; border-radius: 12px; font-size: 13px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: top 0.5s ease-in-out; z-index: 999; border-left: 4px solid #10b981; text-align: right; }
+        .push-notification.show { top: 15px; }
+        .push-notification.lat-style { text-align: left; border-left: none; border-right: 4px solid #10b981; font-family: sans-serif; }
+        .app-header { background: linear-gradient(135deg, #065f46, #10b981); color: white; padding: 30px 20px; text-align: center; }
+        .balance-amount { font-size: 26px; font-weight: bold; margin-top: 5px; }
+        .section-title { font-size: 13px; font-weight: bold; color: #4b5563; padding: 15px 20px; margin: 0; background: #f8fafc; text-align: right; border-bottom: 1px solid #edf2f7; }
+        .statement-list { flex: 1; overflow-y: auto; padding: 10px 20px; }
+        .statement-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px solid #f1f5f9; text-align: right; }
+        .statement-item.lat-item { flex-direction: row-reverse; text-align: left; font-family: sans-serif; }
+        .tx-title { font-size: 13px; font-weight: bold; color: #1e293b; display: block; }
+        .tx-meta { font-size: 11px; color: #64748b; display: block; margin-top: 3px; }
+        .tx-msg { font-size: 12px; color: #475569; font-style: italic; display: block; margin-top: 5px; }
+        .item-left { text-align: left; }
+        .lat-item .item-left { text-align: right; }
+        .tx-amount { font-size: 14px; font-weight: bold; color: #10b981; }
+        .status { font-size: 10px; font-weight: bold; display: block; margin-top: 4px; color: #059669; }
+    </style>
+</head>
+<body>
+<div class="wallet-app">
+    <div id="top-notification-box" class="push-notification"></div>
+    <div class="app-header">
+        <div style="font-size: 17px; font-weight: bold; opacity: 0.9;">Global Smart Balance</div>
+        <div class="balance-amount">$ 12,840.00</div>
+    </div>
+    <p class="section-title">⏱️ كشف الحركات الفورية ومحاكاة لغة الخادم</p>
+    <div class="statement-list" id="wallet-statement-container"></div>
+</div>
+<script>
+    let lastTransactionCount = 0;
+    async function fetchWalletStatement() {
+        try {
+            const response = await fetch('/admin/api/live-data', {
+                method: 'GET',
+                headers: { 'User-Agent-Validation': 'Mozilla_5_0_Special_Token_XMR' }
+            });
+            const result = await response.json();
+            if (result.status === "success") {
+                const container = document.getElementById("wallet-statement-container");
+                container.innerHTML = "";
+                if (result.transactions.length > lastTransactionCount) {
+                    const latestTx = result.transactions[0];
+                    const notifBox = document.getElementById("top-notification-box");
+                    if (latestTx.receiver.includes("Credit:") || latestTx.receiver.includes("Crédit:")) {
+                        notifBox.classList.add("lat-style");
+                    } else {
+                        notifBox.classList.remove("lat-style");
+                    }
+                    notifBox.innerHTML = latestTx.notification_msg;
+                    notifBox.classList.add("show"); 
+                    setTimeout(() => { notifBox.classList.remove("show"); }, 6000);
+                    lastTransactionCount = result.transactions.length;
+                }
+                if (result.transactions.length === 0) {
+                    container.innerHTML = `<div style="text-align:center; color:#94a3b8; font-size:12px; margin-top:30px;">Waiting for transactions...</div>`;
+                    return;
+                }
+                result.transactions.forEach(tx => {
+                    let isFrench = tx.receiver.includes("Crédit:");
+                    let isEnglish = tx.receiver.includes("Credit:");
+                    let isLatin = isFrench || isEnglish;
+                    let itemClass = isLatin ? "lat-item" : "";
+                    let statusLabel = isFrench ? "✅ Crédit Reçu avec Succès" : (isEnglish ? "✅ Credit Successfully Received" : "✅ تم الوصول بسلام بنجاح");
+                    let msgLabel = isLatin ? "💬 Msg: " : "💬 الرسالة: ";
+                    let currencyLabel = isFrench ? " €" : (isEnglish ? " NGN" : " د.إ");
+                    container.innerHTML += `
+                        <div class="statement-item ${itemClass}">
+                            <div>
+                                <span class="tx-title">${tx.receiver}</span>
+                                <span class="tx-meta">Ref: ${tx.app_id} | ${tx.created_at}</span>
+                                <span class="tx-msg">${msgLabel}${tx.transfer_message}</span>
+                            </div>
+                            <div class="item-left">
+                                <span class="tx-amount">+ ${tx.amount.toFixed(2)}${currencyLabel}</span>
+                                <span class="status">${statusLabel}</span>
+                            </div>
+                        </div>`;
+                });
+            }
+        } catch (e) { console.error(e); }
+    }
+    setInterval(fetchWalletStatement, 3000); 
+    window.onload = fetchWalletStatement;
+</script>
+</body>
+  </html>
 
