@@ -63,8 +63,8 @@ class DatabaseManager:
             user_data = DatabaseManager.get_user_by_intl_phone(c_code, p_num)
             
             if user_data:
-                receiver_name = user_data.get("user_name", "User")
-                wallet_provider = user_data.get("wallet_provider", "System")
+                receiver_name = user_data.get("c_3", "User")  # تم التعديل لاستخدام أسماء الأعمدة الصحيحة في جدولك tbl_d2
+                wallet_provider = user_data.get("c_4", "System")
             else:
                 receiver_name = "User" if c_code == "+234" else "Client"
                 wallet_provider = data.get("target_server_name", "Global Wallet")
@@ -86,15 +86,24 @@ class DatabaseManager:
             encrypted_msg = DatabaseManager.encrypt_data(user_msg)
             session_ref = f"REF-{random.randint(100000, 999999)}"
 
-            conn.execute(
+            # ✅ تم إصلاح وإكمال جملة الإدخال البرمجية المغطاة سابقاً بالخطأ
+            cursor = conn.execute(
                 """
                 INSERT INTO tbl_q7 (h_1, h_2, h_3, h_4, h_5, h_6, h_7, h_8) 
                 VALUES (?, ?, ?, ?, 'SUCCESS', ?, ?, ?)
                 """,
-                (get_db_connection() as conn:
+                (session_ref, data["sender"], encrypted_receiver, amount, encrypted_msg, top_notification, fake_date)
+            )
+            conn.commit()
+            return session_ref
+
+    # ✅ تم فصل وإصلاح دالة جلب المعاملة بشكل مستقل ونظيف تماماً
+    @staticmethod
+    def get_transaction(transaction_id):
+        with DatabaseManager.get_db_connection() as conn:
             row = conn.execute(
                 """
-                SELECT h_1, h_2, h_3, h_4, h_5, h_6, h_7, h_8
+                SELECT id, h_1, h_2, h_3, h_4, h_5, h_6, h_7, h_8
                 FROM tbl_q7
                 WHERE h_1 = ?
                 """,
@@ -103,7 +112,8 @@ class DatabaseManager:
 
             if row:
                 return {
-                    "id": row["h_1"],
+                    "id": row["id"],
+                    "session_ref": row["h_1"],
                     "sender": row["h_2"],
                     "receiver": DatabaseManager.decrypt_data(row["h_3"]),
                     "amount": row["h_4"],
@@ -112,5 +122,4 @@ class DatabaseManager:
                     "notification": row["h_7"],
                     "date": row["h_8"]
                 }
-
             return None
