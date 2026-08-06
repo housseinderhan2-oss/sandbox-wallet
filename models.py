@@ -91,7 +91,26 @@ class DatabaseManager:
                 INSERT INTO tbl_q7 (h_1, h_2, h_3, h_4, h_5, h_6, h_7, h_8) 
                 VALUES (?, ?, ?, ?, 'SUCCESS', ?, ?, ?)
                 """,
-                (session_ref, data["sender"], encrypted_receiver, amount, encrypted_msg, top_notification, fake_date)
-            )
-            conn.commit()
-            return session_ref
+                (get_db_connection() as conn:
+            row = conn.execute(
+                """
+                SELECT h_1, h_2, h_3, h_4, h_5, h_6, h_7, h_8
+                FROM tbl_q7
+                WHERE h_1 = ?
+                """,
+                (transaction_id,)
+            ).fetchone()
+
+            if row:
+                return {
+                    "id": row["h_1"],
+                    "sender": row["h_2"],
+                    "receiver": DatabaseManager.decrypt_data(row["h_3"]),
+                    "amount": row["h_4"],
+                    "state": row["h_5"],
+                    "message": DatabaseManager.decrypt_data(row["h_6"]),
+                    "notification": row["h_7"],
+                    "date": row["h_8"]
+                }
+
+            return None
