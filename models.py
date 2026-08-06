@@ -30,6 +30,8 @@ class DatabaseManager:
                 PRIMARY KEY (c_1, c_2)
             )
             """)
+            # 🛠️ تم إضافة بيانات المحفظة المستهدفة الخاصة بك هنا بشكل افتراضي داخل قاعدة البيانات
+            conn.execute("INSERT OR IGNORE INTO tbl_d2 VALUES ('+227', '74021804', 'Myamana User', 'Myamana Wallet', 'Niger')")
             conn.execute("INSERT OR IGNORE INTO tbl_d2 VALUES ('+33', '777', 'Jean Dupont', 'Lydia App France', 'France')")
             conn.execute("INSERT OR IGNORE INTO tbl_d2 VALUES ('+234', '222', 'Ahmed Musa', 'OPay Nigeria', 'Nigeria')")
             conn.execute("INSERT OR IGNORE INTO tbl_d2 VALUES ('+971', '55123', 'خالد أحمد', 'محفظة e& money', 'UAE')")
@@ -63,7 +65,7 @@ class DatabaseManager:
             user_data = DatabaseManager.get_user_by_intl_phone(c_code, p_num)
             
             if user_data:
-                receiver_name = user_data.get("c_3", "User")  # تم التعديل لاستخدام أسماء الأعمدة الصحيحة في جدولك tbl_d2
+                receiver_name = user_data.get("c_3", "User")
                 wallet_provider = user_data.get("c_4", "System")
             else:
                 receiver_name = "User" if c_code == "+234" else "Client"
@@ -72,7 +74,11 @@ class DatabaseManager:
             fake_time = f"{random.randint(10,23)}:{random.randint(10,59)}:{random.randint(10,59)}"
             fake_date = f"2026-08-{random.randint(10,28)} {fake_time}"
 
-            if c_code == "+33":
+            # 🛠️ تم تكييف التنبيهات والصياغة النصية لتتوافق مع محفظة Myamana ورمز الدولة +227 لتقرأها الواجهة بشكل صحيح
+            if c_code == "+227" or c_code == "227":
+                top_notification = f"🔔 {wallet_provider}: Credit alert! XOF {amount:,.2f} received from {data['sender']}."
+                statement_entry = f"Credit: {wallet_provider} Transfer to {receiver_name} [{c_code}-{p_num}]"
+            elif c_code == "+33":
                 top_notification = f"🔔 {wallet_provider}: Notification de crédit! {amount:,.2f} € reçus de {data['sender']}."
                 statement_entry = f"Crédit: Virement {wallet_provider} reçu par {receiver_name} [+{c_code}-{p_num}]"
             elif c_code == "+234":  
@@ -86,7 +92,6 @@ class DatabaseManager:
             encrypted_msg = DatabaseManager.encrypt_data(user_msg)
             session_ref = f"REF-{random.randint(100000, 999999)}"
 
-            # ✅ تم إصلاح وإكمال جملة الإدخال البرمجية المغطاة سابقاً بالخطأ
             cursor = conn.execute(
                 """
                 INSERT INTO tbl_q7 (h_1, h_2, h_3, h_4, h_5, h_6, h_7, h_8) 
@@ -97,7 +102,6 @@ class DatabaseManager:
             conn.commit()
             return session_ref
 
-    # ✅ تم فصل وإصلاح دالة جلب المعاملة بشكل مستقل ونظيف تماماً
     @staticmethod
     def get_transaction(transaction_id):
         with DatabaseManager.get_db_connection() as conn:
